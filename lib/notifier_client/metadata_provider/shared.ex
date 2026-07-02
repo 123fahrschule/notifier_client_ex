@@ -16,8 +16,20 @@ defmodule NotifierClient.MetadataProvider.Shared do
   @impl true
   def build(metadata, config, context) do
     metadata
-    |> Map.put_new(:event_id, shared_uuid() || Identifier.uuid())
+    |> put_event_id()
     |> Default.build(config, context)
+  end
+
+  defp put_event_id(metadata) do
+    if event_id(metadata) do
+      metadata
+    else
+      Map.put(metadata, :event_id, shared_uuid() || Identifier.uuid())
+    end
+  end
+
+  defp event_id(metadata) do
+    Map.get(metadata, :event_id) || Map.get(metadata, "event_id")
   end
 
   defp shared_uuid do
