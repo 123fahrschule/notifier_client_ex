@@ -273,6 +273,56 @@ NotifierClient.send_email(email)
 
 The idempotency key is serialized to Notifier as `email_delivery_request_identifier`. It should be deterministic for the triggering business action so retries do not create duplicate delivery requests. `NotifierClient.Email.delivery_request_id/2` is available as an alias for `NotifierClient.Email.idempotency_key/2`.
 
+### Email builder API
+
+`NotifierClient.Email` commands are immutable structs. Every builder function returns an updated command and can be chained:
+
+- `new/0`: starts a new email command.
+- `idempotency_key/2`: sets the deterministic delivery request identifier.
+- `delivery_request_id/2`: alias for `idempotency_key/2`.
+- `template/2`: sets the Notifier email template slug.
+- `to/2`: appends one or more `to` recipients.
+- `cc/2`: appends one or more `cc` recipients.
+- `bcc/2`: appends one or more `bcc` recipients.
+- `from/2`: sets the sender address.
+- `reply_to/2`: sets the reply-to address.
+- `subject/2`: sets the email subject.
+- `put_placeholder/3`: adds or replaces one placeholder.
+- `put_placeholders/2`: merges multiple placeholders at once.
+- `deliver_at/2`: schedules delivery for a `DateTime`.
+- `priority/2`: sets the delivery priority.
+- `attach_s3/4`: adds an Amazon S3 attachment.
+- `metadata/2`: merges multiple event metadata fields.
+- `put_metadata/3`: adds or replaces one event metadata field.
+
+Recipient functions accept a single email address, a `{name, address}` tuple, or a list of either form:
+
+```elixir
+email
+|> NotifierClient.Email.to("teamlead@example.com")
+|> NotifierClient.Email.cc(["cc1@example.com", "cc2@example.com"])
+|> NotifierClient.Email.bcc({"Team Archive", "archive@example.com"})
+```
+
+Placeholders can be added one at a time:
+
+```elixir
+email
+|> NotifierClient.Email.put_placeholder("pending_requests_count", 3)
+```
+
+Or merged in one call:
+
+```elixir
+email
+|> NotifierClient.Email.put_placeholders(%{
+  "first_name" => "Ada",
+  "pending_requests_count" => 3
+})
+```
+
+Placeholder keys must be strings. Atom keys such as `:pending_requests_count` are rejected by validation because Notifier placeholders are serialized as string-keyed JSON object fields.
+
 Supported priorities are:
 
 - `:highest` / `"highest"`
@@ -291,3 +341,62 @@ email
   "file.pdf"
 )
 ```
+
+Metadata can also be set through the email builder:
+
+```elixir
+email
+|> NotifierClient.Email.metadata(
+  event_id: "domain-event-id",
+  correlation_id: "correlation-id"
+)
+|> NotifierClient.Email.put_metadata(:actor, "de.123fahrschule:absence")
+```
+
+With the default and shared metadata providers, metadata keys may be atoms or strings. Custom metadata providers receive the metadata map unchanged and decide which key conventions they support.
+
+## Public API Reference
+
+Delivery:
+
+- `NotifierClient.send_email/2`: encodes and publishes an email command.
+- `NotifierClient.deliver/2`: generic delivery entry point; currently supports `NotifierClient.Email`.
+
+Email event helpers:
+
+- `NotifierClient.Email.Event.type/0`: returns the Notifier email event type.
+- `NotifierClient.Email.Event.subject/0`: returns the Notifier email event subject.
+- `NotifierClient.Email.Event.to_event/2`: validates an email command and returns `{:ok, event}` or `{:error, %NotifierClient.ValidationError{}}`.
+- `NotifierClient.Email.Event.to_json/2`: validates an email command and returns `{:ok, json, event}` or `{:error, %NotifierClient.ValidationError{}}`.
+
+Configuration and metadata:
+
+- `NotifierClient.Config.get/1`: resolves application config plus per-call overrides.
+- `NotifierClient.Config.publish_options/2`: builds publisher options for a command type.
+- `NotifierClient.Metadata.build/3`: delegates metadata envelope creation to the configured metadata provider.
+- `NotifierClient.MetadataProvider.Default.build/3`: builds the default event metadata envelope.
+- `NotifierClient.MetadataProvider.Shared.build/3`: uses `Shared.UUID.generate/0` when available, otherwise follows the default provider behavior.
+- `NotifierClient.Identifier.uuid/0`: generates a UUIDv4 string.
+- `NotifierClient.Identifier.source_urn/1`: converts a service name such as `"absence"` to `"de.123fahrschule:absence"`.
+
+Validation and encoding:
+
+- `NotifierClient.Email.Validator.validate/1`: validates an email command and returns `:ok` or `{:error, %NotifierClient.ValidationError{}}`.
+- `NotifierClient.ValidationError.message/1`: formats validation errors for exception messages.
+- `NotifierClient.JSONCodec.BuiltIn.encode!/1`: encodes terms through Elixir's built-in `JSON.encode!/1`.
+
+Publisher adapters:
+
+- `NotifierClient.Publisher.Tackle.publish/2`: publishes an encoded JSON payload through Tackle.
+- `NotifierClient.Publisher.Stub.publish/2`: captures a publish call in the current process for tests.
+- `NotifierClient.Publisher.Stub.message_tag/0`: returns `:notifier_client_published`.
+- `NotifierClient.Publisher.Stub.put_receiver/1`: sends captured publish messages to another process.
+- `NotifierClient.Publisher.Stub.clear_receiver/0`: clears the process-local receiver.
+- `NotifierClient.Publisher.Stub.put_result/1`: configures the process-local result returned by `publish/2`.
+- `NotifierClient.Publisher.Stub.clear_result/0`: clears the configured process-local result.
+
+Behaviours for custom integrations:
+
+- `NotifierClient.Publisher.publish/2`: callback for publisher adapters.
+- `NotifierClient.JSONCodec.encode!/1`: callback for JSON codecs.
+- `NotifierClient.MetadataProvider.build/3`: callback for metadata providers.
