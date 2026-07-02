@@ -40,7 +40,7 @@ Example target shape:
 email =
   NotifierClient.Email.new()
   |> NotifierClient.Email.idempotency_key("de.123fahrschule:absence:pending-absence-reminder:...")
-  |> NotifierClient.Email.template("absence/team-leads/daily_remidner_of_absence_pending_requests")
+  |> NotifierClient.Email.template("absence/team-leads/daily_reminder_of_absence_pending_requests")
   |> NotifierClient.Email.to("teamlead@example.com")
   |> NotifierClient.Email.from("info@123fahrschule.de")
   |> NotifierClient.Email.put_placeholder("pending_requests_count", 3)
@@ -91,9 +91,9 @@ Alternative considered: depend on Jason unconditionally. Rejected because it is 
 
 ### Use a publisher behaviour with a Tackle adapter
 
-Define a publisher behaviour for publishing serialized command events. The production adapter should use Tackle 1.2-style publishing with pooled publisher connections. Tests should use a stub adapter that records the generated event and publish options.
+Define a publisher behaviour for publishing serialized command events. The production adapter should use Tackle's publish API with pooled publisher connections. The client should include a public stub adapter that records the generated event and publish options for tests.
 
-Rationale: The caller-facing API should be independent from RabbitMQ, but the first production transport remains the existing RabbitMQ contract. Tackle 1.2 already supports lazy pooled publishers, so the client does not need its own publishing GenServer for the first version.
+Rationale: The caller-facing API should be independent from RabbitMQ, but the first production transport remains the existing RabbitMQ contract. Tackle already supports lazy pooled publishers, so the client does not need its own publishing GenServer for the first version.
 
 Alternative considered: expose Tackle options in every send call. Rejected because it leaks transport concerns into application code and recreates the problem this client is meant to solve.
 

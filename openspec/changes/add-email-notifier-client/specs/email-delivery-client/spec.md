@@ -124,7 +124,7 @@ The system SHALL provide both generic command delivery and a domain-readable E-M
 - **WHEN** the configured publisher returns `:ok` or `{:error, reason}`
 - **THEN** the delivery API returns the publisher result to the caller
 
-#### Scenario: Use test publisher without RabbitMQ
+#### Scenario: Use bundled test publisher without RabbitMQ
 
-- **WHEN** tests configure a non-RabbitMQ publisher implementation
-- **THEN** the system sends the serialized event and publish options to that publisher implementation without requiring a RabbitMQ connection
+- **WHEN** tests configure the bundled publisher stub
+- **THEN** the system sends the serialized event and publish options to the test process without requiring a RabbitMQ connection
